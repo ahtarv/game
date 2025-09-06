@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* =========================
-   Shared assets & helpers
-   ========================= */
+
 const MEMORY_SYMBOLS = [
   "🍎","🍌","🍒","🍇","🍉","🍓","🥝","🍍",
   "🥑","🍆","🥕","🌽","🥔","🥦","🍅","🫑",
@@ -30,7 +28,7 @@ function shuffleDeck(deck) {
   return arr;
 }
 
-/* Framer variants */
+//framer
 const cardFlipVariants = {
   front: { rotateY: 180, transition: { duration: 0.45 } },
   back: { rotateY: 0, transition: { duration: 0.45 } }
@@ -40,7 +38,7 @@ const dealVariant = {
   visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 20 } }
 };
 
-/* Hand evaluator (comprehensive) */
+//check hand 
 function evaluate7(cards) {
   const counts = {};
   const suitMap = {};
@@ -125,10 +123,6 @@ function estimateHandStrength(hole, community) {
   return Math.min(0.999, base + kickerFactor * 0.1);
 }
 
-/* =========================
-   Small UI components
-   ========================= */
-
 function PokerCard({ card, hidden=false, animateFlip=false }) {
   return (
     <motion.div
@@ -148,15 +142,12 @@ function PokerCard({ card, hidden=false, animateFlip=false }) {
   );
 }
 
-/* =========================
-   Main App
-   ========================= */
 
 export default function App() {
   const [mode, setMode] = useState("menu"); // menu, memory, poker
   const [bankroll, setBankroll] = useState(500);
 
-  /* Memory state */
+  
   const [memDeck, setMemDeck] = useState([]);
   const [memFlipped, setMemFlipped] = useState([]);
   const [memMatched, setMemMatched] = useState([]);
@@ -167,7 +158,7 @@ export default function App() {
   const [memStreak, setMemStreak] = useState(0);
   const [memNearMiss, setMemNearMiss] = useState(null);
 
-  /* sounds */
+  
   const [music] = useState(typeof Audio !== "undefined" ? new Audio("/casino-music.mp3") : null);
   const [coinSound] = useState(typeof Audio !== "undefined" ? new Audio("/coin.mp3") : null);
   const [jackpotSound] = useState(typeof Audio !== "undefined" ? new Audio("/jackpot.mp3") : null);
@@ -181,7 +172,7 @@ export default function App() {
     } else {
       if (music) { music.pause(); try{music.currentTime=0}catch{} }
     }
-    // eslint-disable-next-line
+    
   }, [mode]);
 
   function initMemory() {
@@ -232,21 +223,19 @@ export default function App() {
       setMemNearMiss(unmatchedBonus);
       setTimeout(()=> setMemFlipped([]), 900);
     }
-    // eslint-disable-next-line
+   // eslint-disable-next-line
   }, [memFlipped]);
 
   useEffect(()=> {
     if (memMatched.length > 0 && memMatched.length === memDeck.length && memDeck.length>0) setMemWin(true);
   }, [memMatched]);
 
-  /* -------------------------
-     Poker state & logic
-     ------------------------- */
-  const [pCount, setPCount] = useState(4); // total players including human
-  const [pPlayers, setPPlayers] = useState([]); // {id,name,hand,bankroll,betThisRound,folded,active}
+
+  const [pCount, setPCount] = useState(4); 
+  const [pPlayers, setPPlayers] = useState([]); 
   const [pDeck, setPDeck] = useState([]);
   const [pCommunity, setPCommunity] = useState([]);
-  const [pStage, setPStage] = useState("waiting"); // waiting, preflop, flop, turn, river, showdown
+  const [pStage, setPStage] = useState("waiting"); 
   const [pPot, setPPot] = useState(0);
   const [pCurrentIndex, setPCurrentIndex] = useState(0);
   const [pCurrentBet, setPCurrentBet] = useState(0);
@@ -269,7 +258,6 @@ export default function App() {
       const bank = i===0 ? bankroll : 200;
       players.push({ id:i, name, hand, bankroll: bank, betThisRound: 0, folded:false, active:true });
     }
-    // post blinds relative to dealer index
     const sbIndex = (pDealerIndex + 1) % total;
     const bbIndex = (pDealerIndex + 2) % total;
     players[sbIndex].bankroll = Math.max(0, players[sbIndex].bankroll - pSmallBlind);
@@ -290,10 +278,8 @@ export default function App() {
     setTimeout(()=>setIsDealing(false), 600);
   }
 
-  /* advance stage after betting finishes */
   function advanceStage() {
     if (pStage === "preflop") {
-      // flop
       const deck = pDeck.slice();
       const flop = [deck.pop(), deck.pop(), deck.pop()];
       setPDeck(deck);
@@ -338,10 +324,8 @@ export default function App() {
 
   function psLength(){ return pPlayers.length || 0; }
 
-  /* loop to make bots/human act in betting rounds */
   useEffect(() => {
     if (!pRoundActive) return;
-    // if only one active player, go to showdown
     const activePlayers = pPlayers.filter(p=>!p.folded && p.active);
     if (activePlayers.length <= 1) {
       setPRoundActive(false);
@@ -349,7 +333,6 @@ export default function App() {
       doShowdown();
       return;
     }
-    // ensure currentIndex points to an active player
     let idx = pCurrentIndex;
     let tries = 0;
     while (tries < psLength() && (pPlayers[idx]?.folded || !pPlayers[idx]?.active)) {
@@ -360,13 +343,10 @@ export default function App() {
     const player = pPlayers[idx];
     if (!player) return;
     if (player.id === 0) {
-      // human: wait for UI actions
       return;
     } else {
-      // bot acts after small timeout for realism
       setTimeout(()=> botAct(idx), 400 + Math.random()*400);
     }
-    // eslint-disable-next-line
   }, [pRoundActive, pPlayers, pCurrentIndex]);
 
   function botAct(index) {
@@ -412,7 +392,6 @@ export default function App() {
     setPCurrentIndex((index + 1) % psLength());
   }
 
-  /* Human actions */
   function humanFold() {
     setPPlayers(ps => {
       const c = ps.slice();
@@ -458,7 +437,6 @@ export default function App() {
     scored.sort((a,b)=> compareEval(a.eval, b.eval));
     const winp = scored[0];
     setPWinner(winp);
-    // award pot
     if (winp.id === 0) {
       setBankroll(prev => prev + pPot);
     } else {
@@ -467,17 +445,14 @@ export default function App() {
     setPPot(0);
   }
 
-  /* Visual helpers */
   function displayCard(c) { return c ? `${c.rank}${c.suit}` : ""; }
 
-  /* UI: start full poker game */
   function startPoker() {
     setPDealerIndex(prev => (prev + 1) % pCount);
     initPokerRound();
   }
 
   function initPokerRound() {
-    // wrapper to rotate dealer and setup round
     initDealerRound(pDealerIndex);
   }
 
@@ -510,14 +485,9 @@ export default function App() {
     setTimeout(()=> setIsDealing(false), 600);
   }
 
-  /* small effects to show the pot changes */
   useEffect(()=> {
-    // if pStage moves to showdonw we handle awarding in doShowdown
   }, [pStage]);
 
-  /* =======================
-     Render
-     ======================= */
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-[#082A0F] via-[#0B2E1A] to-[#06301A] text-white">
       <div className="max-w-6xl mx-auto">
@@ -608,7 +578,6 @@ export default function App() {
                   <div className="inline-block bg-black/50 px-4 py-2 rounded">Pot <strong>${pPot}</strong></div>
                 </div>
                 <div className="absolute bottom-6 left-6 w-48">
-                  {/* left side players (some bots) */}
                 </div>
                 <div className="absolute top-6 left-6 space-y-3">
                   {pPlayers.slice(1,3).map((pl, idx)=>(

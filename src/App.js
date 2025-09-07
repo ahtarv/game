@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
+import Card from "./Card"; // Make sure this path is correct for your project structure
 
 const MEMORY_SYMBOLS = [
   "🍎","🍌","🍒","🍇","🍉","🍓","🥝","🍍",
@@ -13,7 +13,6 @@ const SUITS = ["♠","♥","♦","♣"];
 const RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
 const RANK_TO_VALUE = Object.fromEntries(RANKS.map((r,i)=>[r,i]));
 
-/* Deck utils */
 function buildDeck() {
   const d = [];
   for (const s of SUITS) for (const r of RANKS) d.push({rank:r, suit:s, code: r + s});
@@ -28,17 +27,6 @@ function shuffleDeck(deck) {
   return arr;
 }
 
-//framer
-const cardFlipVariants = {
-  front: { rotateY: 180, transition: { duration: 0.45 } },
-  back: { rotateY: 0, transition: { duration: 0.45 } }
-};
-const dealVariant = {
-  hidden: { y: -40, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 20 } }
-};
-
-//check hand 
 function evaluate7(cards) {
   const counts = {};
   const suitMap = {};
@@ -123,31 +111,11 @@ function estimateHandStrength(hole, community) {
   return Math.min(0.999, base + kickerFactor * 0.1);
 }
 
-function PokerCard({ card, hidden=false, animateFlip=false }) {
-  return (
-    <motion.div
-      className="w-16 h-22 perspective"
-      initial="back"
-      animate={animateFlip ? (hidden ? "back" : "front") : (hidden ? "back" : "front")}
-      variants={cardFlipVariants}
-      style={{ transformStyle: "preserve-3d" }}
-    >
-      <div className="absolute inset-0 backface-hidden rounded-lg overflow-hidden">
-        <img src="/card-back.jpg" alt="back" className="w-full h-full object-cover rounded-lg shadow-inner"/>
-      </div>
-      <div className="absolute inset-0 backface-hidden rounded-lg overflow-hidden" style={{ transform: "rotateY(180deg)" }}>
-        <div className="w-full h-full flex items-center justify-center bg-white text-black rounded-lg text-lg font-bold">{card ? `${card.rank}${card.suit}` : ""}</div>
-      </div>
-    </motion.div>
-  );
-}
-
-
 export default function App() {
-  const [mode, setMode] = useState("menu"); // menu, memory, poker
+  const [mode, setMode] = useState("menu");
   const [bankroll, setBankroll] = useState(500);
 
-  
+  // MEMORY ROYALE --------------------------------
   const [memDeck, setMemDeck] = useState([]);
   const [memFlipped, setMemFlipped] = useState([]);
   const [memMatched, setMemMatched] = useState([]);
@@ -156,39 +124,31 @@ export default function App() {
   const [memGameOver, setMemGameOver] = useState(false);
   const [memWin, setMemWin] = useState(false);
   const [memStreak, setMemStreak] = useState(0);
-  const [memNearMiss, setMemNearMiss] = useState(null);
 
-  
+  // Sounds
   const [music] = useState(typeof Audio !== "undefined" ? new Audio("/casino-music.mp3") : null);
   const [coinSound] = useState(typeof Audio !== "undefined" ? new Audio("/coin.mp3") : null);
   const [jackpotSound] = useState(typeof Audio !== "undefined" ? new Audio("/jackpot.mp3") : null);
-  const [shuffleSound] = useState(typeof Audio !== "undefined" ? new Audio("/shuffle.mp3") : null);
-  const [dealSound] = useState(typeof Audio !== "undefined" ? new Audio("/deal.mp3") : null);
 
   useEffect(() => {
     if (mode === "memory") {
-      initMemory();
+      const deck = [...MEMORY_SYMBOLS, ...MEMORY_SYMBOLS].slice(0, 64)
+        .sort(()=> Math.random() - 0.5)
+        .map((v,i)=>({id:i, value:v, bonus: Math.random() < 0.08}));
+      setMemDeck(deck);
+      setMemFlipped([]);
+      setMemMatched([]);
+      setMemBet(10);
+      setMemAttempts(3);
+      setMemGameOver(false);
+      setMemWin(false);
+      setMemStreak(0);
       if (music) { music.loop = true; music.volume = 0.25; music.play().catch(()=>{}); }
     } else {
       if (music) { music.pause(); try{music.currentTime=0}catch{} }
     }
-    
+    // eslint-disable-next-line
   }, [mode]);
-
-  function initMemory() {
-    const deck = [...MEMORY_SYMBOLS, ...MEMORY_SYMBOLS].slice(0, 64) // up to 64
-      .sort(()=> Math.random() - 0.5)
-      .map((v,i)=>({id:i, value:v, bonus: Math.random() < 0.08}));
-    setMemDeck(deck);
-    setMemFlipped([]);
-    setMemMatched([]);
-    setMemBet(10);
-    setMemAttempts(3);
-    setMemGameOver(false);
-    setMemWin(false);
-    setMemStreak(0);
-    setMemNearMiss(null);
-  }
 
   function onMemCardClick(card) {
     if (memGameOver || memWin) return;
@@ -210,7 +170,6 @@ export default function App() {
       setMemMatched(prev => [...prev, a, b]);
       setMemStreak(s=>s+1);
       setMemFlipped([]);
-      setMemNearMiss(null);
     } else {
       setBankroll(prev => Math.max(0, prev - memBet));
       setMemAttempts(prev => {
@@ -219,135 +178,74 @@ export default function App() {
         return na;
       });
       setMemStreak(0);
-      const unmatchedBonus = memDeck.find(c => c.bonus && !memMatched.includes(c));
-      setMemNearMiss(unmatchedBonus);
       setTimeout(()=> setMemFlipped([]), 900);
     }
-   // eslint-disable-next-line
+  // eslint-disable-next-line
   }, [memFlipped]);
 
   useEffect(()=> {
     if (memMatched.length > 0 && memMatched.length === memDeck.length && memDeck.length>0) setMemWin(true);
-  }, [memMatched]);
+  }, [memMatched, memDeck]);
 
-
-  const [pCount, setPCount] = useState(4); 
-  const [pPlayers, setPPlayers] = useState([]); 
+  // POKER ROYALE --------------------------------
+  const [pCount] = useState(4);
+  const [pPlayers, setPPlayers] = useState([]);
   const [pDeck, setPDeck] = useState([]);
   const [pCommunity, setPCommunity] = useState([]);
-  const [pStage, setPStage] = useState("waiting"); 
+  const [pStage, setPStage] = useState("waiting");
   const [pPot, setPPot] = useState(0);
   const [pCurrentIndex, setPCurrentIndex] = useState(0);
   const [pCurrentBet, setPCurrentBet] = useState(0);
   const [pRoundActive, setPRoundActive] = useState(false);
   const [pWinner, setPWinner] = useState(null);
   const [pDealerIndex, setPDealerIndex] = useState(0);
-  const [pSmallBlind, setPSmallBlind] = useState(10);
-  const [pBigBlind, setPBigBlind] = useState(20);
-  const [pMinRaise, setPMinRaise] = useState(20);
-  const [isDealing, setIsDealing] = useState(false);
+  const [pSmallBlind] = useState(10);
+  const [pBigBlind] = useState(20);
+  const [pMinRaise] = useState(20);
 
-  function initPokerRound() {
-    if (shuffleSound) try{ shuffleSound.play().catch(()=>{}) }catch{}
+  function psLength(){ return pPlayers.length || 0; }
+
+  function doShowdown() {
+    const contenders = pPlayers.filter(p => !p.folded);
+    if (contenders.length === 0) { setPWinner(null); return; }
+    const scored = contenders.map(p => ({...p, eval: evaluate7([...p.hand, ...pCommunity])}));
+    scored.sort((a,b)=> compareEval(a.eval, b.eval));
+    const winp = scored[0];
+    setPWinner(winp);
+    if (winp.id === 0) {
+      setBankroll(prev => prev + pPot);
+    } else {
+      setPPlayers(ps => ps.map(pl => pl.id === winp.id ? {...pl, bankroll: pl.bankroll + pPot} : pl));
+    }
+    setPPot(0);
+  }
+
+  function initDealerRound(dealerIdx) {
     const deck = shuffleDeck(buildDeck());
     const players = [];
-    const total = pCount;
-    for (let i=0;i<total;i++){
+    for (let i=0;i<pCount;i++){
       const name = i===0 ? "You" : `Bot ${i}`;
       const hand = [deck.pop(), deck.pop()];
       const bank = i===0 ? bankroll : 200;
-      players.push({ id:i, name, hand, bankroll: bank, betThisRound: 0, folded:false, active:true });
+      players.push({ id:i, name, hand, bankroll: bank, betThisRound:0, folded:false, active:true });
     }
-    const sbIndex = (pDealerIndex + 1) % total;
-    const bbIndex = (pDealerIndex + 2) % total;
+    const sbIndex = (dealerIdx + 1) % pCount;
+    const bbIndex = (dealerIdx + 2) % pCount;
     players[sbIndex].bankroll = Math.max(0, players[sbIndex].bankroll - pSmallBlind);
-    players[sbIndex].betThisRound = (players[sbIndex].betThisRound || 0) + pSmallBlind;
+    players[sbIndex].betThisRound = pSmallBlind;
     players[bbIndex].bankroll = Math.max(0, players[bbIndex].bankroll - pBigBlind);
-    players[bbIndex].betThisRound = (players[bbIndex].betThisRound || 0) + pBigBlind;
-    const initialBet = pBigBlind;
+    players[bbIndex].betThisRound = pBigBlind;
     setPPlayers(players);
     setPDeck(deck);
     setPCommunity([]);
     setPStage("preflop");
     setPPot(pSmallBlind + pBigBlind);
-    setPCurrentBet(initialBet);
-    setPCurrentIndex((bbIndex + 1) % total); // first to act after big blind
+    setPCurrentBet(pBigBlind);
+    setPCurrentIndex((bbIndex + 1) % pCount);
     setPRoundActive(true);
     setPWinner(null);
-    setIsDealing(true);
-    setTimeout(()=>setIsDealing(false), 600);
+    setPDealerIndex(dealerIdx);
   }
-
-  function advanceStage() {
-    if (pStage === "preflop") {
-      const deck = pDeck.slice();
-      const flop = [deck.pop(), deck.pop(), deck.pop()];
-      setPDeck(deck);
-      setPCommunity(flop);
-      setPPlayers(ps => ps.map(p=>({...p, betThisRound:0})));
-      setPCurrentBet(0);
-      setPCurrentIndex((pDealerIndex + 1) % psLength());
-      setPRoundActive(true);
-      setPStage("flop");
-      if (dealSound) try{ dealSound.play().catch(()=>{}) }catch{}
-    } else if (pStage === "flop") {
-      const deck = pDeck.slice();
-      const turn = deck.pop();
-      setPDeck(deck);
-      setPCommunity(prev=>[...prev, turn]);
-      setPPlayers(ps => ps.map(p=>({...p, betThisRound:0})));
-      setPCurrentBet(0);
-      setPCurrentIndex((pDealerIndex + 1) % psLength());
-      setPStage("turn");
-      setPRoundActive(true);
-      if (dealSound) try{ dealSound.play().catch(()=>{}) }catch{}
-    } else if (pStage === "turn") {
-      const deck = pDeck.slice();
-      const river = deck.pop();
-      setPDeck(deck);
-      setPCommunity(prev=>[...prev, river]);
-      setPPlayers(ps => ps.map(p=>({...p, betThisRound:0})));
-      setPCurrentBet(0);
-      setPCurrentIndex((pDealerIndex + 1) % psLength());
-      setPStage("river");
-      setPRoundActive(true);
-      if (dealSound) try{ dealSound.play().catch(()=>{}) }catch{}
-    } else if (pStage === "river") {
-      setPPlayers(ps => ps.map(p=>({...p, betThisRound:0})));
-      setPCurrentBet(0);
-      setPCurrentIndex((pDealerIndex + 1) % psLength());
-      setPStage("showdown");
-      setPRoundActive(false);
-      doShowdown();
-    }
-  }
-
-  function psLength(){ return pPlayers.length || 0; }
-
-  useEffect(() => {
-    if (!pRoundActive) return;
-    const activePlayers = pPlayers.filter(p=>!p.folded && p.active);
-    if (activePlayers.length <= 1) {
-      setPRoundActive(false);
-      setPStage("showdown");
-      doShowdown();
-      return;
-    }
-    let idx = pCurrentIndex;
-    let tries = 0;
-    while (tries < psLength() && (pPlayers[idx]?.folded || !pPlayers[idx]?.active)) {
-      idx = (idx + 1) % psLength();
-      tries++;
-    }
-    setPCurrentIndex(idx);
-    const player = pPlayers[idx];
-    if (!player) return;
-    if (player.id === 0) {
-      return;
-    } else {
-      setTimeout(()=> botAct(idx), 400 + Math.random()*400);
-    }
-  }, [pRoundActive, pPlayers, pCurrentIndex]);
 
   function botAct(index) {
     const players = pPlayers.slice();
@@ -430,63 +328,35 @@ export default function App() {
     setPCurrentIndex((pCurrentIndex + 1) % psLength());
   }
 
-  function doShowdown() {
-    const contenders = pPlayers.filter(p => !p.folded);
-    if (contenders.length === 0) { setPWinner(null); return; }
-    const scored = contenders.map(p => ({...p, eval: evaluate7([...p.hand, ...pCommunity])}));
-    scored.sort((a,b)=> compareEval(a.eval, b.eval));
-    const winp = scored[0];
-    setPWinner(winp);
-    if (winp.id === 0) {
-      setBankroll(prev => prev + pPot);
-    } else {
-      setPPlayers(ps => ps.map(pl => pl.id === winp.id ? {...pl, bankroll: pl.bankroll + pPot} : pl));
+  function nextPokerStage() {
+    if (pStage === "preflop") {
+      setPCommunity(prev => [...pDeck.slice(0, 3)]);
+      setPDeck(prev => prev.slice(3));
+      setPStage("flop");
+      resetPokerBets();
+    } else if (pStage === "flop") {
+      setPCommunity(prev => [...prev, pDeck[0]]);
+      setPDeck(prev => prev.slice(1));
+      setPStage("turn");
+      resetPokerBets();
+    } else if (pStage === "turn") {
+      setPCommunity(prev => [...prev, pDeck[0]]);
+      setPDeck(prev => prev.slice(1));
+      setPStage("river");
+      resetPokerBets();
+    } else if (pStage === "river") {
+      setPStage("showdown");
+      doShowdown();
     }
-    setPPot(0);
+  }
+
+  function resetPokerBets() {
+    setPPlayers(ps => ps.map(p => ({ ...p, betThisRound: 0 })));
+    setPCurrentBet(0);
+    setPCurrentIndex(pDealerIndex);
   }
 
   function displayCard(c) { return c ? `${c.rank}${c.suit}` : ""; }
-
-  function startPoker() {
-    setPDealerIndex(prev => (prev + 1) % pCount);
-    initPokerRound();
-  }
-
-  function initPokerRound() {
-    initDealerRound(pDealerIndex);
-  }
-
-  function initDealerRound(dealerIdx) {
-    if (shuffleSound) try{ shuffleSound.play().catch(()=>{}) }catch{}
-    const deck = shuffleDeck(buildDeck());
-    const players = [];
-    for (let i=0;i<pCount;i++){
-      const name = i===0 ? "You" : `Bot ${i}`;
-      const hand = [deck.pop(), deck.pop()];
-      const bank = i===0 ? bankroll : 200;
-      players.push({ id:i, name, hand, bankroll: bank, betThisRound:0, folded:false, active:true });
-    }
-    const sbIndex = (dealerIdx + 1) % pCount;
-    const bbIndex = (dealerIdx + 2) % pCount;
-    players[sbIndex].bankroll = Math.max(0, players[sbIndex].bankroll - pSmallBlind);
-    players[sbIndex].betThisRound = pSmallBlind;
-    players[bbIndex].bankroll = Math.max(0, players[bbIndex].bankroll - pBigBlind);
-    players[bbIndex].betThisRound = pBigBlind;
-    setPPlayers(players);
-    setPDeck(deck);
-    setPCommunity([]);
-    setPStage("preflop");
-    setPPot(pSmallBlind + pBigBlind);
-    setPCurrentBet(pBigBlind);
-    setPCurrentIndex((bbIndex + 1) % pCount);
-    setPRoundActive(true);
-    setPWinner(null);
-    setIsDealing(true);
-    setTimeout(()=> setIsDealing(false), 600);
-  }
-
-  useEffect(()=> {
-  }, [pStage]);
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-[#082A0F] via-[#0B2E1A] to-[#06301A] text-white">
@@ -498,8 +368,8 @@ export default function App() {
           </div>
           <div className="flex gap-3">
             <button className="px-3 py-2 bg-gray-700 rounded" onClick={()=>setMode("menu")}>Menu</button>
-            <button className="px-3 py-2 bg-yellow-400 text-black rounded" onClick={()=>{ setMode("memory"); initMemory(); }}>Memory Royale</button>
-            <button className="px-3 py-2 bg-yellow-400 text-black rounded" onClick={()=>{ setMode("poker"); initDealerRound(pDealerIndex); }}>Poker Royale</button>
+            <button className="px-3 py-2 bg-yellow-400 text-black rounded" onClick={()=>setMode("memory")}>Memory Royale</button>
+            <button className="px-3 py-2 bg-yellow-400 text-black rounded" onClick={()=>{setMode("poker"); initDealerRound(pDealerIndex);}}>Poker Royale</button>
           </div>
         </header>
 
@@ -507,8 +377,8 @@ export default function App() {
           <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
             <h2 className="text-2xl">Choose your game</h2>
             <div className="flex gap-4">
-              <button className="px-6 py-3 bg-yellow-400 text-black rounded" onClick={()=>{ setMode("memory"); initMemory(); }}>Play Memory Royale</button>
-              <button className="px-6 py-3 bg-yellow-400 text-black rounded" onClick={()=>{ setMode("poker"); initDealerRound(pDealerIndex); }}>Play Poker Royale</button>
+              <button className="px-6 py-3 bg-yellow-400 text-black rounded" onClick={()=>setMode("memory")}>Play Memory Royale</button>
+              <button className="px-6 py-3 bg-yellow-400 text-black rounded" onClick={()=>{setMode("poker"); initDealerRound(pDealerIndex);}}>Play Poker Royale</button>
             </div>
           </div>
         )}
@@ -523,24 +393,35 @@ export default function App() {
               </div>
               <div className="flex gap-2">
                 <button className="px-3 py-2 bg-blue-600 rounded" onClick={()=>setMode("menu")}>Back</button>
-                <button className="px-3 py-2 bg-green-600 rounded" onClick={initMemory}>Restart</button>
+                <button className="px-3 py-2 bg-green-600 rounded" onClick={()=>{
+                  const deck = [...MEMORY_SYMBOLS, ...MEMORY_SYMBOLS].slice(0, 64)
+                    .sort(()=> Math.random() - 0.5)
+                    .map((v,i)=>({id:i, value:v, bonus: Math.random() < 0.08}));
+                  setMemDeck(deck);
+                  setMemFlipped([]);
+                  setMemMatched([]);
+                  setMemBet(10);
+                  setMemAttempts(3);
+                  setMemGameOver(false);
+                  setMemWin(false);
+                  setMemStreak(0);
+                }}>Restart</button>
               </div>
             </div>
-
             <div className="grid grid-cols-8 gap-3">
-              {memDeck.map(card => (
-                <motion.div key={card.id} variants={dealVariant} initial="hidden" animate="visible" className="w-20 h-28">
-                  <div onClick={()=>onMemCardClick(card)}>
-                    <motion.div className="relative w-full h-full rounded-lg shadow-lg [transform-style:preserve-3d]" animate={memFlipped.some(c=>c.id===card.id) || memMatched.some(c=>c.id===card.id) ? "front" : "back"} variants={cardFlipVariants} style={{ transformStyle: "preserve-3d" }}>
-                      <div className="absolute inset-0 backface-hidden rounded-lg overflow-hidden">
-                        <img src="/card-back.jpg" alt="back" className="w-full h-full object-cover rounded-lg"/>
-                      </div>
-                      <div className="absolute inset-0 backface-hidden rounded-lg overflow-hidden" style={{ transform: "rotateY(180deg)" }}>
-                        <div className={`w-full h-full flex items-center justify-center text-2xl ${card.bonus ? "bg-yellow-300 text-black animate-pulse":"bg-white text-black"} rounded-lg`}>{card.value}</div>
-                      </div>
-                    </motion.div>
-                  </div>
-                </motion.div>
+              {memDeck.length === 0 ? (
+                <div className="col-span-8 text-center text-xl mt-8">Loading...</div>
+              ) : memDeck.map(card => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  flipped={
+                    memFlipped.some(c => c.id === card.id) ||
+                    memMatched.some(c => c.id === card.id)
+                  }
+                  nearMiss={false}
+                  onClick={onMemCardClick}
+                />
               ))}
             </div>
           </div>
@@ -560,7 +441,6 @@ export default function App() {
                 <button className="px-3 py-2 bg-yellow-400 rounded text-black" onClick={()=>initDealerRound(pDealerIndex)}>New Round</button>
               </div>
             </div>
-
             <div className="relative flex items-center justify-center">
               <div className="w-[760px] h-[380px] rounded-full bg-[radial-gradient(circle_at_center,_#0a3d1f,_#043017)] shadow-2xl flex flex-col items-center justify-center">
                 <div className="mb-6">
@@ -577,8 +457,7 @@ export default function App() {
                 <div className="text-center mb-4">
                   <div className="inline-block bg-black/50 px-4 py-2 rounded">Pot <strong>${pPot}</strong></div>
                 </div>
-                <div className="absolute bottom-6 left-6 w-48">
-                </div>
+                <div className="absolute bottom-6 left-6 w-48"></div>
                 <div className="absolute top-6 left-6 space-y-3">
                   {pPlayers.slice(1,3).map((pl, idx)=>(
                     <div key={idx} className="p-2 bg-green-800 rounded w-40">
@@ -591,7 +470,6 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
                 <div className="absolute top-6 right-6 space-y-3">
                   {pPlayers.slice(3,6).map((pl, idx)=>(
                     <div key={idx} className="p-2 bg-green-800 rounded w-40">
@@ -604,7 +482,6 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
                 {/* bottom (You) */}
                 <div className="absolute bottom-6 w-full flex items-end justify-center">
                   <div className="w-[520px] p-4 bg-black/40 rounded flex flex-col items-center">
@@ -615,16 +492,15 @@ export default function App() {
                     <div className="flex gap-3">
                       {pPlayers[0] && (pStage === "showdown" ? pPlayers[0].hand.map((c,i)=>(<div key={i} className="w-20 h-28 bg-white text-black rounded flex items-center justify-center text-lg">{displayCard(c)}</div>)) : pPlayers[0].hand.map((c,i)=>(<div key={i} className="w-20 h-28 bg-white text-black rounded flex items-center justify-center text-lg">{displayCard(c)}</div>)))}
                     </div>
-
                     {pStage !== "showdown" && (
                       <div className="mt-3 flex gap-3">
                         <button className="px-3 py-1 bg-gray-200 text-black rounded" onClick={()=>humanCheck()}>Check</button>
                         <button className="px-3 py-1 bg-gray-200 text-black rounded" onClick={()=>humanCall()}>Call</button>
                         <button className="px-3 py-1 bg-red-500 text-white rounded" onClick={()=>humanFold()}>Fold</button>
                         <button className="px-3 py-1 bg-green-400 text-black rounded" onClick={()=>humanRaise(pMinRaise)}>Raise {pMinRaise}</button>
+                        <button className="px-3 py-1 bg-blue-400 text-black rounded" onClick={nextPokerStage}>Next Stage</button>
                       </div>
                     )}
-
                     {pStage === "showdown" && pWinner && (
                       <div className="mt-3 text-lg">
                         <div>Winner: <strong>{pWinner.name}</strong></div>
@@ -637,12 +513,10 @@ export default function App() {
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
         )}
-a
       </div>
     </div>
   );
